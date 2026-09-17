@@ -14,9 +14,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -35,11 +32,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # 加入所有產出的 xlsx 檔案
           git add *.xlsx || true
           
-          if git diff --cached --quiet; then
-            echo "沒有檢測到 Excel 變更，跳过 Commit"
-          else
-            git commit -m "Auto-update exhibition Excel"
-            git push origin HEAD:${{ github.ref_name }}
-          fi
+          # 建立 commit 並自動推送至預設分支
+          git commit -m "Auto-update exhibition Excel" || exit 0
+          git push -u origin HEAD
