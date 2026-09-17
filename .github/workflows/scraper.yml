@@ -2,8 +2,12 @@ name: Run TaiNEX Scraper
 
 on:
   schedule:
-    - cron: '0 0 * * 1' # 每週一自動執行一次
-  workflow_dispatch:     # 支援手動觸發
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+# 新增此區塊以授予推送到儲存庫的權限
+permissions:
+  contents: write
 
 jobs:
   build:
