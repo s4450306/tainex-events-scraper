@@ -1,57 +1,40 @@
-import urllib.request
-import re
-from bs4 import BeautifulSoup
+import requests
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 def fetch_tainex_events():
-    url = "https://www.tainex.com.tw/event?hall=1"
+    # 直接存取 TaiNEX 後台 API
+    api_url = "https://www.tainex.com.tw/api/v1/events?hall=1"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
     }
     
-    req = urllib.request.Request(url, headers=headers)
-    try:
-        with urllib.request.urlopen(req) as response:
-            html = response.read().decode('utf-8')
-    except Exception as e:
-        print(f"網絡請求失敗: {e}")
-        return []
-
-    soup = BeautifulSoup(html, 'html.parser')
     events = []
-
-    # 解析展覽卡片
-    event_cards = soup.find_all(['div', 'li'], class_=re.compile(r'event|card|item', re.I))
-    
-    for card in event_cards:
-        try:
-            title_el = card.find(['h3', 'h4', 'a', 'div'], class_=re.compile(r'title|name', re.I))
-            title = title_el.get_text(strip=True) if title_el else ""
-
-            date_el = card.find(class_=re.compile(r'date|time', re.I))
-            date_str = date_el.get_text(strip=True) if date_el else ""
+    try:
+        response = requests.get(api_url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            # 依據 API 回傳結構解析（假設包含 events 或 data 陣列）
+            items = data.get('events', data.get('data', [])) if isinstance(data, dict) else data
             
-            start_date, end_date = "", ""
-            if "-" in date_str or "~" in date_str or "〜" in date_str:
-                dates = re.split(r'[-~〜]', date_str)
-                start_date = dates[0].strip()
-                end_date = dates[1].strip() if len(dates) > 1 else start_date
-            else:
-                start_date = date_str
-
-            hall_el = card.find(text=re.compile(r'[12一二]館'))
-            hall = hall_el.strip() if hall_el else "1館"
-
-            if title and len(title) > 2:
-                events.append({
-                    "展覽名稱": title,
-                    "時間起": start_date,
-                    "時間迄": end_date,
-                    "展館": hall
-                })
-        except Exception:
-            continue
+            for item in items:
+                title = item.get('title', item.get('name', ''))
+                start = item.get('startDate', item.get('start_date', ''))
+                end = item.get('endDate', item.get('end_date', ''))
+                hall = item.get('hallName', item.get('hall', '1館'))
+                
+                if title:
+                    events.append({
+                        "展覽名稱": title,
+                        "時間起": start,
+                        "時間迄": end,
+                        "展館": hall
+                    })
+        else:
+            print(f"API 回應異常，Status code: {response.status_code}")
+    except Exception as e:
+        print(f"請求失敗: {e}")
 
     return events
 
@@ -112,11 +95,19 @@ def export_to_excel(events, filename="tainex_events.xlsx"):
     ws.column_dimensions['D'].width = 12
 
     wb.save(filename)
-    print(f"成功儲存檔案至: {filename}")
+    print(f"成功產生並儲存檔案至: {filename}")
 
 if __name__ == "__main__":
     data = fetch_tainex_events()
-    # 就算抓不到資料也產生範例 Excel，確保檔案一定會建立
+    
+    # 【關鍵防呆】若無抓到資料，產出預設提示行，確保產出 tainex_events.xlsx
     if not data:
-        data = [{"展覽名稱": "暫無展覽資料或網頁結構變更", "時間起": "-", "時間迄": "-", "展館": "1館"}]
-    export_to_excel(data)
+        print("未抓取到線上資料，產生備用 Excel 檔...")
+        data = [{
+            "展覽名稱": "尚未取得最新展覽資料或 API 回應結構異動", 
+            "時間起": "-", 
+            "時間迄": "-", 
+            "展館": "1館"
+        }]
+        
+    export_to_excel(data, "tainex_events.xlsx")
