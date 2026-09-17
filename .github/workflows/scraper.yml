@@ -2,10 +2,9 @@ name: Run TaiNEX Scraper
 
 on:
   schedule:
-    - cron: '0 0 * * 1'
-  workflow_dispatch:
+    - cron: '0 0 * * 1' # 每週一自動執行
+  workflow_dispatch:     # 支援手動觸發
 
-# 新增此區塊以授予推送到儲存庫的權限
 permissions:
   contents: write
 
@@ -15,6 +14,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # 明確傳入預設的權限 Token
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -33,6 +34,6 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add tainex_events.xlsx
+          git add *.xlsx || true
           git commit -m "Auto-update exhibition Excel" || exit 0
-          git push
+          git push origin main
