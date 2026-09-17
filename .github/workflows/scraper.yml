@@ -34,11 +34,13 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+          
+          # 自動加入資料夾內所有的 .xlsx 檔案
           git add *.xlsx || true
           
-          # 檢查是否有檔案變更，若無變更則正常跳過不報錯
-          if git diff --staged --quiet; then
-            echo "沒有任何 Excel 檔案變更，跳過 Commit"
+          # 判斷是否有檔案需要提交
+          if git diff --cached --quiet; then
+            echo "沒有檢測到 Excel 變更，跳過 Commit"
           else
             git commit -m "Auto-update exhibition Excel"
             git push
