@@ -2,8 +2,8 @@ name: Run TaiNEX Scraper
 
 on:
   schedule:
-    - cron: '0 0 * * 1' # 每週一自動執行
-  workflow_dispatch:     # 支援手動觸發
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }} # 明確傳入預設的權限 Token
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,8 +32,14 @@ jobs:
 
       - name: Commit and push updated Excel
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           git add *.xlsx || true
-          git commit -m "Auto-update exhibition Excel" || exit 0
-          git push origin main
+          
+          # 檢查是否有檔案變更，若無變更則正常跳過不報錯
+          if git diff --staged --quiet; then
+            echo "沒有任何 Excel 檔案變更，跳過 Commit"
+          else
+            git commit -m "Auto-update exhibition Excel"
+            git push
+          fi
