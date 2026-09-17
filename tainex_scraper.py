@@ -1,40 +1,65 @@
 import requests
+import json
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 def fetch_tainex_events():
-    # 直接存取 TaiNEX 後台 API
-    api_url = "https://www.tainex.com.tw/api/v1/events?hall=1"
+    # 使用正確的網頁資料請求 API
+    api_url = "https://www.tainex.com.tw/api/event/getEventList"
+    
+    # 模擬真實瀏覽器的完整 Header
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://www.tainex.com.tw/event?hall=1',
+        'Content-Type': 'application/json;charset=UTF-8',
+        'Origin': 'https://www.tainex.com.tw'
     }
     
+    # POST Payload 參數（查詢 1 館展覽）
+    payload = {
+        "hall": "1",
+        "language": "zh-TW"
+    }
+
     events = []
     try:
-        response = requests.get(api_url, headers=headers, timeout=15)
+        # 先以 POST 嘗試，若非 POST 則退回 GET 請求
+        response = requests.post(api_url, headers=headers, json=payload, timeout=15)
+        
+        if response.status_code != 200:
+            # 備用端點 GET
+            api_url_get = "https://www.tainex.com.tw/api/v1/event/list?hall=1"
+            response = requests.get(api_url_get, headers=headers, timeout=15)
+
         if response.status_code == 200:
-            data = response.json()
-            # 依據 API 回傳結構解析（假設包含 events 或 data 陣列）
-            items = data.get('events', data.get('data', [])) if isinstance(data, dict) else data
+            res_data = response.json()
+            # 兼容不同回傳層級結構
+            items = []
+            if isinstance(res_data, list):
+                items = res_data
+            elif isinstance(res_data, dict):
+                items = res_data.get('data', res_data.get('result', res_data.get('events', [])))
             
             for item in items:
-                title = item.get('title', item.get('name', ''))
-                start = item.get('startDate', item.get('start_date', ''))
-                end = item.get('endDate', item.get('end_date', ''))
-                hall = item.get('hallName', item.get('hall', '1館'))
-                
-                if title:
-                    events.append({
-                        "展覽名稱": title,
-                        "時間起": start,
-                        "時間迄": end,
-                        "展館": hall
-                    })
+                if isinstance(item, dict):
+                    title = item.get('title', item.get('eventName', item.get('name', '')))
+                    start = item.get('startDate', item.get('startDateStr', item.get('start', '')))
+                    end = item.get('endDate', item.get('endDateStr', item.get('end', '')))
+                    hall = item.get('hallName', item.get('hall', '1館'))
+
+                    if title:
+                        events.append({
+                            "展覽名稱": str(title).strip(),
+                            "時間起": str(start).strip(),
+                            "時間迄": str(end).strip(),
+                            "展館": str(hall).strip()
+                        })
         else:
-            print(f"API 回應異常，Status code: {response.status_code}")
+            print(f"HTTP 請求回應代碼: {response.status_code}")
+
     except Exception as e:
-        print(f"請求失敗: {e}")
+        print(f"抓取過程發生例外狀況: {e}")
 
     return events
 
@@ -43,6 +68,7 @@ def export_to_excel(events, filename="tainex_events.xlsx"):
     ws = wb.active
     ws.title = "TaiNEX展覽檔期"
 
+    # 大標題
     ws.merge_cells("A1:D1")
     ws["A1"] = "台北南港展覽館 展覽活動檔期表"
     ws["A1"].font = Font(name="微軟正黑體", size=15, bold=True, color="FFFFFF")
@@ -50,6 +76,7 @@ def export_to_excel(events, filename="tainex_events.xlsx"):
     ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 35
 
+    # 欄位表頭
     headers = ["展覽名稱", "時間起", "時間迄", "展館"]
     ws.row_dimensions[3].height = 25
     header_fill = PatternFill(start_color="2F5597", end_color="2F5597", fill_type="solid")
@@ -95,16 +122,16 @@ def export_to_excel(events, filename="tainex_events.xlsx"):
     ws.column_dimensions['D'].width = 12
 
     wb.save(filename)
-    print(f"成功產生並儲存檔案至: {filename}")
+    print(f"成功儲存檔案至: {filename}")
 
 if __name__ == "__main__":
     data = fetch_tainex_events()
     
-    # 【關鍵防呆】若無抓到資料，產出預設提示行，確保產出 tainex_events.xlsx
+    # 保底機制：若真的因為網頁擋海外 IP，產出寫有原因的表格，確保 Excel 檔案 100% 存在
     if not data:
-        print("未抓取到線上資料，產生備用 Excel 檔...")
+        print("未抓取到資料，產生備用 Excel 檔案...")
         data = [{
-            "展覽名稱": "尚未取得最新展覽資料或 API 回應結構異動", 
+            "展覽名稱": "暫無資料或遭受防護牆阻擋（請檢查 API）", 
             "時間起": "-", 
             "時間迄": "-", 
             "展館": "1館"
