@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install beautifulsoup4 pandas openpyxl
+          pip install beautifulsoup4 pandas openpyxl requests
 
       - name: Run script
         run: python tainex_scraper.py
@@ -33,9 +33,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
-          # 加入所有產出的 xlsx 檔案
-          git add *.xlsx || true
+          # 將所有檔案加入暫存區
+          git add -A
           
-          # 建立 commit 並自動推送至預設分支
-          git commit -m "Auto-update exhibition Excel" || exit 0
-          git push -u origin HEAD
+          # 檢查是否有檔案變更，若沒有則正常跳過
+          if git diff --cached --quiet; then
+            echo "沒有檢測到任何檔案變更，順利結束"
+          else
+            git commit -m "Auto-update exhibition Excel"
+            git push
+          fi
