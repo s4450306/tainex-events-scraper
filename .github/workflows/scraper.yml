@@ -1,0 +1,34 @@
+name: Run TaiNEX Scraper
+
+on:
+  schedule:
+    - cron: '0 0 * * 1' # 每週一自動執行一次
+  workflow_dispatch:     # 支援手動觸發
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install beautifulsoup4 pandas openpyxl
+
+      - name: Run script
+        run: python tainex_scraper.py
+
+      - name: Commit and push updated Excel
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add tainex_events.xlsx
+          git commit -m "Auto-update exhibition Excel" || exit 0
+          git push
